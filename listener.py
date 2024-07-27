@@ -51,13 +51,9 @@ def scanBlocks(chain, start_block, end_block, contract_address):
     else:
         print(f"Scanning blocks {start_block} - {end_block} on {chain}")
 
-    if end_block - start_block < 30:
-        event_filter = contract.events.Deposit.create_filter(fromBlock=start_block, toBlock=end_block, argument_filters=arg_filter)
-        events = event_filter.get_all_entries()
-        #print( f"Got {len(events)} entries for block {block_num}" )
-        
-        # YOUR CODE HERE
-        event_data = []
+    event_data = []
+    
+    def process_events(events):
         for evt in events:
             data = {
                 'chain': chain,
@@ -68,31 +64,27 @@ def scanBlocks(chain, start_block, end_block, contract_address):
                 'address': evt['address'],
             }
             event_data.append(data)
-        
-        if event_data:
-            df = pd.DataFrame(event_data)
-            df.to_csv(eventfile, mode='a', header=False, index=False)
+
+    if end_block - start_block < 30:
+        event_filter = contract.events.Deposit.create_filter(fromBlock=start_block, toBlock=end_block, argument_filters=arg_filter)
+        events = event_filter.get_all_entries()
+        process_events(events)
     else:
-        all_event_data = []
         for block_num in range(start_block, end_block + 1):
             event_filter = contract.events.Deposit.create_filter(fromBlock=block_num, toBlock=block_num, argument_filters=arg_filter)
             events = event_filter.get_all_entries()
-            #print( f"Got {len(events)} entries for block {block_num}" )
-            
-            # YOUR CODE HERE
-            for evt in events:
-                data = {
-                    'chain': chain,
-                    'token': evt['args']['token'],
-                    'recipient': evt['args']['recipient'],
-                    'amount': evt['args']['amount'],
-                    'transactionHash': evt['transactionHash'].hex(),
-                    'address': evt['address'],
-                }
-                all_event_data.append(data)
-        
-        if all_event_data:
-            df = pd.DataFrame(all_event_data)
+            process_events(events)
+    
+    if event_data:
+        df = pd.DataFrame(event_data)
+        # Ensure the file exists and has the correct header if not already present
+        try:
+            existing_df = pd.read_csv(eventfile)
+            if set(existing_df.columns) != set(df.columns):
+                raise ValueError("Existing CSV columns do not match new data columns")
+        except (FileNotFoundError, ValueError):
+            df.to_csv(eventfile, mode='w', header=True, index=False)
+        else:
             df.to_csv(eventfile, mode='a', header=False, index=False)
 
     print(f"Events successfully written to {eventfile}")
