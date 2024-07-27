@@ -1,7 +1,7 @@
 from web3 import Web3
 from web3.contract import Contract
 from web3.providers.rpc import HTTPProvider
-from web3.middleware import geth_poa_middleware # Necessary for POA chains
+from web3.middleware import geth_poa_middleware  # Necessary for POA chains
 import json
 from datetime import datetime
 import pandas as pd
@@ -19,10 +19,10 @@ def scanBlocks(chain, start_block, end_block, contract_address):
     and writes information about the events to the file "deposit_logs.csv"
     """
     if chain == 'avax':
-        api_url = f"https://api.avax-test.network/ext/bc/C/rpc" # AVAX C-chain testnet
+        api_url = f"https://api.avax-test.network/ext/bc/C/rpc"  # AVAX C-chain testnet
 
     if chain == 'bsc':
-        api_url = f"https://data-seed-prebsc-1-s1.binance.org:8545/" # BSC testnet
+        api_url = f"https://data-seed-prebsc-1-s1.binance.org:8545/"  # BSC testnet
 
     if chain in ['avax', 'bsc']:
         w3 = Web3(Web3.HTTPProvider(api_url))
@@ -51,19 +51,48 @@ def scanBlocks(chain, start_block, end_block, contract_address):
     else:
         print(f"Scanning blocks {start_block} - {end_block} on {chain}")
 
-    def process_events(events):
+    if end_block - start_block < 30:
+        event_filter = contract.events.Deposit.create_filter(fromBlock=start_block, toBlock=end_block, argument_filters=arg_filter)
+        events = event_filter.get_all_entries()
+        #print( f"Got {len(events)} entries for block {block_num}" )
+        
+        # YOUR CODE HERE
         event_data = []
         for evt in events:
             data = {
                 'chain': chain,
-                'token': evt.args['token'],
-                'recipient': evt.args['recipient'],
-                'amount': evt.args['amount'],
-                'transactionHash': evt.transactionHash.hex(),
-                'address': evt.address,
+                'token': evt['args']['token'],
+                'recipient': evt['args']['recipient'],
+                'amount': evt['args']['amount'],
+                'transactionHash': evt['transactionHash'].hex(),
+                'address': evt['address'],
             }
             event_data.append(data)
-        return event_data
+        
+        if event_data:
+            df = pd.DataFrame(event_data)
+            df.to_csv(eventfile, mode='a', header=False, index=False)
+    else:
+        all_event_data = []
+        for block_num in range(start_block, end_block + 1):
+            event_filter = contract.events.Deposit.create_filter(fromBlock=block_num, toBlock=block_num, argument_filters=arg_filter)
+            events = event_filter.get_all_entries()
+            #print( f"Got {len(events)} entries for block {block_num}" )
+            
+            # YOUR CODE HERE
+            for evt in events:
+                data = {
+                    'chain': chain,
+                    'token': evt['args']['token'],
+                    'recipient': evt['args']['recipient'],
+                    'amount': evt['args']['amount'],
+                    'transactionHash': evt['transactionHash'].hex(),
+                    'address': evt['address'],
+                }
+                all_event_data.append(data)
+        
+        if all_event_data:
+            df = pd.DataFrame(all_event_data)
+            df.to_csv(eventfile, mode='a', header=False, index=False)
 
-    if end_block - start_block < 30:
-        event_filter = contract.events.Deposit.create_filter(fromBlock=start_block, toBlock=end_block, argument_filters
+    print(f"Events successfully written to {eventfile}")
