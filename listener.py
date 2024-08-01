@@ -77,14 +77,14 @@ def scanBlocks(chain, start_block, end_block, contract_address):
     
     if event_data:
         df = pd.DataFrame(event_data)
-        # Ensure the file exists and has the correct header if not already present
+      
         try:
             existing_df = pd.read_csv(eventfile)
             if set(existing_df.columns) != set(df.columns):
-                raise ValueError("Existing CSV columns do not match new data columns")
+                raise ValueError("CSV cols mismatch")
         except (FileNotFoundError, ValueError):
             df.to_csv(eventfile, mode='w', header=True, index=False)
         else:
             df.to_csv(eventfile, mode='a', header=False, index=False)
 
-    print(f"Events successfully written to {eventfile}")
+    print(f"Events successful in {eventfile}")
